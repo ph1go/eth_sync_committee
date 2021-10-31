@@ -17,8 +17,11 @@ if not config_file.is_file():
 
 cfg.read(config_file)
 
-base_url = f'http://{cfg["beacon"].get("url", fallback="localhost")}:{cfg["beacon"].get("port", fallback="5052")}'
-head_url = base_url + '/eth/v1/beacon/states/head/sync_committees'
-finalized_url = base_url + '/eth/v1/beacon/states/finalized/sync_committees'
-block_url = base_url + '/eth/v2/beacon/blocks/'
-genesis_url = base_url + '/eth/v1/beacon/genesis'
+beacon_node_url = cfg["beacon"].get("url", fallback="localhost")
+beacon_node_port = cfg["beacon"].get("port", fallback="5052")
+
+base_url = f'http://{beacon_node_url}:{beacon_node_port}'
+head_url = f'{base_url}/eth/v1/beacon/states/head/sync_committees'
+finalized_url = f'{base_url}/eth/v1/beacon/states/finalized/sync_committees'
+block_url = f'{base_url}/eth/v2/beacon/blocks/'
+genesis_url = f'{base_url}/eth/v1/beacon/genesis'
