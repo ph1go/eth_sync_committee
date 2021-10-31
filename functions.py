@@ -19,13 +19,6 @@ def fetch_url(url):
         return response.json()
 
 
-def get_genesis_time():
-    response = fetch_url(genesis_url)
-    gen_time_s = int(response['data']['genesis_time'])
-
-    return datetime.fromtimestamp(gen_time_s, timezone.utc)
-
-
 @dataclass
 class Epoch:
     name: str
