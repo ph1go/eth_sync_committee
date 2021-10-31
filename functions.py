@@ -7,8 +7,20 @@ from typing import List
 from constants import validators_file, finalized_url, genesis_url, block_url
 
 
+def fetch_url(url):
+    try:
+        response = requests.get(url)
+
+    except requests.exceptions.ConnectionError:
+        print(f'\n invalid url (are you sure your beacon node is running on this machine?): {url}\n')
+        exit()
+
+    else:
+        return response.json()
+
+
 def get_genesis_time():
-    response = requests.get(genesis_url).json()
+    response = fetch_url(genesis_url)
     gen_time_s = int(response['data']['genesis_time'])
 
     return datetime.fromtimestamp(gen_time_s, timezone.utc)
@@ -40,7 +52,7 @@ class SyncCommittee(Epoch):
     def __post_init__(self, my_validators: List[str]):
         super().__post_init__()
         self.is_sync_committee = True
-        response = requests.get(f'{finalized_url}?epoch={self.epoch_number}').json()
+        response = fetch_url(f'{finalized_url}?epoch={self.epoch_number}')
         try:
             self.all_validators = sorted(response['data']['validators'], key=int)
 
@@ -129,7 +141,7 @@ def get_user_validators(user_provided):
 
 
 def get_epochs(my_validators):
-    response = requests.get(f'{block_url}head').json()
+    response = fetch_url(f'{block_url}head')
     current_slot = int(response['data']['message']['slot'])
     current_epoch = int(current_slot / 32)
     current_sc_start_epoch = int(current_epoch / 256) * 256
