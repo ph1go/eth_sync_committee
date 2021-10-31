@@ -186,4 +186,4 @@ def print_all_validators(validators):
 
 
 def stringify_list(input_list):
-    return f'{", ".join(input_list[:-1])} and {input_list[-1]}' if len(input_list) > 1 else f'{input_list[0]}'
+    return f'{", ".join(input_list[:-1])} and {input_list[-1]}' if len(input_list) > 1 else input_list[0]
