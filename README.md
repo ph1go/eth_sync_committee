@@ -1,2 +1,3 @@
-# eth_sync_committee
-An application to see if your Ethereum staking validator(s) are members of the current or next post-Altair sync committees.
+Since the Altair upgrade, 512 validators are randomly chosen every 256 epochs (~27 hours) 
+to form a sync committee. Validators in this committee receive much higher rewards. This application helps you ascertain 
+if your validators
