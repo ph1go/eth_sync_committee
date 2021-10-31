@@ -142,7 +142,7 @@ def get_epochs(my_validators):
     next_sc_2_start_epoch = current_sc_start_epoch + 512
 
     response = fetch_url(genesis_url)
-    genesis_time =  datetime.fromtimestamp(int(response['data']['genesis_time']), timezone.utc)
+    genesis_time = datetime.fromtimestamp(int(response['data']['genesis_time']), timezone.utc)
 
     epochs = {
         'c_sync': SyncCommittee(
