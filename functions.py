@@ -26,9 +26,6 @@ def get_genesis_time():
     return datetime.fromtimestamp(gen_time_s, timezone.utc)
 
 
-genesis_time = get_genesis_time()
-
-
 @dataclass
 class Epoch:
     name: str
@@ -36,7 +33,9 @@ class Epoch:
     is_sync_committee: bool = False
     start_time: datetime = field(init=False)
 
-    def __post_init__(self):
+    genesis_time: InitVar[datetime] = None
+
+    def __post_init__(self, genesis_time: datetime):
         start_time_utc = genesis_time + timedelta(seconds=384 * self.epoch_number)
         self.start_time = start_time_utc.astimezone()
 
@@ -48,9 +47,10 @@ class SyncCommittee(Epoch):
     validators_str: str = field(init=False)
 
     my_validators: InitVar[List[str]] = None
+    genesis_time: InitVar[datetime] = None
 
-    def __post_init__(self, my_validators: List[str]):
-        super().__post_init__()
+    def __post_init__(self, genesis_time: datetime, my_validators: List[str]):
+        super().__post_init__(genesis_time=genesis_time)
         self.is_sync_committee = True
         response = fetch_url(f'{finalized_url}?epoch={self.epoch_number}')
         try:
@@ -146,15 +146,27 @@ def get_epochs(my_validators):
     current_epoch = int(current_slot / 32)
     current_sc_start_epoch = int(current_epoch / 256) * 256
     next_sc_start_epoch = current_sc_start_epoch + 256
+    next_sc_2_start_epoch = current_sc_start_epoch + 512
+
+    response = fetch_url(genesis_url)
+    genesis_time =  datetime.fromtimestamp(int(response['data']['genesis_time']), timezone.utc)
 
     epochs = {
-        'c_sync': SyncCommittee(name='current sync committee', epoch_number=current_sc_start_epoch,
-                                my_validators=my_validators),
-        'c_epoch': Epoch(name='current epoch', epoch_number=current_epoch),
-        'n_sync': SyncCommittee(name='next sync committee', epoch_number=next_sc_start_epoch,
-                                my_validators=my_validators),
-        'n_sync_2': SyncCommittee(name='next sync committee', epoch_number=next_sc_start_epoch + 256,
-                                  my_validators=my_validators)
+        'c_sync': SyncCommittee(
+            name='current sync committee', epoch_number=current_sc_start_epoch,
+            genesis_time=genesis_time, my_validators=my_validators
+        ),
+        'c_epoch': Epoch(
+            name='current epoch', epoch_number=current_epoch, genesis_time=genesis_time
+        ),
+        'n_sync': SyncCommittee(
+            name='next sync committee', epoch_number=next_sc_start_epoch,
+            genesis_time=genesis_time, my_validators=my_validators
+        ),
+        'n_sync_2': SyncCommittee(
+            name='next sync committee', epoch_number=next_sc_2_start_epoch,
+            genesis_time=genesis_time, my_validators=my_validators
+        )
     }
 
     return epochs
