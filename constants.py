@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 source_path = Path(__file__).parent
 config_file = source_path / 'config.ini'
 validators_file = source_path / 'validators.txt'
+notified_file = source_path / 'notified.json'
 
 cfg = configparser.RawConfigParser()
 

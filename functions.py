@@ -1,3 +1,5 @@
+import json
+
 import requests
 import re
 import smtplib, ssl
@@ -6,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field, InitVar
 from typing import List
 
-from constants import validators_file, config_file, finalized_url, genesis_url, block_url, email_details
+from constants import validators_file, config_file, notified_file, finalized_url, genesis_url, block_url, email_details
 
 
 def fetch_url(url):
@@ -272,40 +274,56 @@ def generate_notification(current_committee, next_committee):
         print(f'{v_msg_1}\n\n {v_msg_2}')
 
     if email_details.are_valid:
-        msg = EmailMessage()
+        if notified_file.is_file():
+            with notified_file.open() as f:
+                notified_committees = json.load(f)
 
-        msg['subject '] = (
-            f'You have {"validators" if num_both > 1 else "a validator"} in the '
-            f'{"current and next" if in_both else "current" if in_current else "next"} '
-            f'sync committee{"s" if in_both else ""}!'
-        )
+        else:
+            notified_committees = {'current': '0', 'next': '0'}
 
-        body = ''
+        if (
+                current_committee.epoch_number != notified_committees['current'] and
+                next_committee.epoch_number != notified_committees['next']
+        ):
+            msg = EmailMessage()
 
-        if num_current:
-            body += (
-                f'sync committee: current\n'
-                f'validators: {current_committee.validators_str}\n'
-                f'committee end time: {current_committee.end_str}'
+            msg['subject '] = (
+                f'You have {"validators" if num_both > 1 else "a validator"} in the '
+                f'{"current and next" if in_both else "current" if in_current else "next"} '
+                f'sync committee{"s" if in_both else ""}!'
             )
 
-        if num_next:
-            body += "\n\n" if num_current else ""
-            body += (
-                f'sync committee: next\n'
-                f'validators: {next_committee.validators_str}\n'
-                f'committee start time: {next_committee.start_str}\n'
-                f'committee end time: {next_committee.end_str}'
-            )
+            body = ''
 
-        a = v_msg_2.replace("\n ", "\n")
-        body += f'\n\n{a}'
+            if num_current:
+                body += (
+                    f'sync committee: current\n'
+                    f'validators: {current_committee.validators_str}\n'
+                    f'committee end time: {current_committee.end_str}'
+                )
 
-        msg.set_content(body)
-        msg['From'] = email_details.from_addr
-        msg['To'] = email_details.to_addr
+            if num_next:
+                body += "\n\n" if num_current else ""
+                body += (
+                    f'sync committee: next\n'
+                    f'validators: {next_committee.validators_str}\n'
+                    f'committee start time: {next_committee.start_str}\n'
+                    f'committee end time: {next_committee.end_str}'
+                )
 
-        send_email(msg)
+            a = v_msg_2.replace("\n ", "\n")
+            body += f'\n\n{a}'
+
+            msg.set_content(body)
+            msg['From'] = email_details.from_addr
+            msg['To'] = email_details.to_addr
+
+            send_email(msg)
+
+            notified_committees = {'current': current_committee.epoch_number, 'next': next_committee.epoch_number}
+
+            with notified_file.open('w') as f:
+                json.dump(notified_committees, f)
 
     else:
         print(
