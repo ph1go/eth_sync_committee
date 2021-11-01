@@ -9,7 +9,7 @@ If your beacon node is not at the default address (`http://localhost:5052`), you
 
 Run `eth_sync_committee.py` to launch the application.
 
-Run with `-v/--validators` to specify your validator index(es). You'll be prompted to add it/them to the validators 
+Run with `-v/--validators` followed by validator index numbers (separated by a space) to specify your validator index(es). You'll be prompted to add it/them to the validators 
 file. Once you've added your validator(s) you can run the application without this argument.
 
 Run with `-p/--print-all` to print all of the validators in the current and next sync committees.
