@@ -12,7 +12,7 @@ cfg = configparser.RawConfigParser()
 
 if not config_file.is_file():
     cfg['beacon'] = {'url': 'localhost', 'port': '5052'}
-    cfg['email'] = {'from': '', 'password': '', 'to': ''}
+    cfg['email'] = {'from address': '', 'from password': '', 'to address': ''}
 
     with config_file.open('w') as f:
         cfg.write(f)
@@ -33,9 +33,9 @@ genesis_url = f'{base_url}/eth/v1/beacon/genesis'
 
 @dataclass
 class EmailDetails:
-    from_addr: str = cfg['email'].get('from')
-    from_pwd: str = cfg['email'].get('password')
-    to_addr: str = cfg['email'].get('to')
+    from_addr: str = cfg['email'].get('from address')
+    from_pwd: str = cfg['email'].get('from password')
+    to_addr: str = cfg['email'].get('to address')
 
     are_valid: bool = field(init=False)
 
