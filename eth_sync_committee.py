@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import argparse
-from functions import get_user_validators, get_epochs, print_all_validators, stringify_list
+from functions import get_user_validators, get_epochs, print_all_validators, stringify_list, generate_notification
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -30,6 +30,9 @@ if __name__ == '__main__':
             f'{epochs[k].start_time.strftime("%Y/%m/%d %H:%M:%S")}   '
             f'{epochs[k].validators_str if epochs[k].is_sync_committee else "n/a"}'
         )
+
+    if epochs['c_sync'].validators or epochs['n_sync'].validators:
+        generate_notification(current_committee=epochs['c_sync'], next_committee=epochs['n_sync'])
 
     if args.print_all:
         for k in ['c_sync', 'n_sync']:

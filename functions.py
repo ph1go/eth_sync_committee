@@ -1,10 +1,12 @@
 import requests
 import re
+import smtplib, ssl
+from email.message import EmailMessage
 from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field, InitVar
 from typing import List
 
-from constants import validators_file, finalized_url, genesis_url, block_url
+from constants import validators_file, config_file, finalized_url, genesis_url, block_url, email_details
 
 
 def fetch_url(url):
@@ -25,18 +27,30 @@ class Epoch:
     epoch_number: int
     is_sync_committee: bool = False
     start_time: datetime = field(init=False)
+    end_time: datetime = field(init=False)
+    start_str: str = field(init=False, default='')
+    end_str: str = field(init=False, default='')
 
     genesis_time: InitVar[datetime] = None
 
     def __post_init__(self, genesis_time: datetime):
         start_time_utc = genesis_time + timedelta(seconds=384 * self.epoch_number)
         self.start_time = start_time_utc.astimezone()
+        start_from_now = (self.start_time - datetime.now().astimezone()).total_seconds()
+
+        if start_from_now > 0:
+            self.start_str = f'{self.start_time.strftime("%Y/%m/%d %H:%M:%S")} ({seconds_to_hms(start_from_now)} from now)'
+
+        end_time_utc = genesis_time + timedelta(seconds=384 * (self.epoch_number + 256))
+        self.end_time = end_time_utc.astimezone()
+        end_from_now = (self.end_time - datetime.now().astimezone()).total_seconds()
+        self.end_str = f'{self.end_time.strftime("%Y/%m/%d %H:%M:%S")} ({seconds_to_hms(end_from_now)} from now)'
 
 
 @dataclass
 class SyncCommittee(Epoch):
-    all_validators: List[str] = field(init=False)
-    validators: List[str] = field(init=False)
+    all_validators: List[str] = field(init=False, default_factory=list)
+    validators: List[str] = field(init=False, default_factory=list)
     validators_str: str = field(init=False)
 
     my_validators: InitVar[List[str]] = None
@@ -53,18 +67,15 @@ class SyncCommittee(Epoch):
             self.validators_str = 'validators in this sync committee are not yet known'
 
         else:
-            self.validators = list(set(self.all_validators).intersection(set(my_validators)))
+            self.validators = sorted(list(set(self.all_validators).intersection(set(my_validators))), key=int)
             if my_validators:
                 if self.validators:
-                    if len(self.validators) == 1:
-                        self.validators_str = self.validators[0]
-
-                    else:
-                        self.validators_str = f'{", ".join(self.validators[:-1])} and {self.validators[-1]}'
+                    self.validators_str = stringify_list(self.validators)
 
                 else:
-                    self.validators_str = 'your validator isn\'t' if len(
-                        my_validators) == 1 else 'none of your validators are'
+                    self.validators_str = (
+                        'your validator isn\'t' if len(my_validators) == 1 else 'none of your validators are'
+                    )
                     self.validators_str += f' in the {self.name} :('
 
             else:
@@ -187,3 +198,117 @@ def print_all_validators(validators):
 
 def stringify_list(input_list):
     return f'{", ".join(input_list[:-1])} and {input_list[-1]}' if len(input_list) > 1 else input_list[0]
+
+
+def seconds_to_hms(seconds):
+    seconds = int(seconds)
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+
+    t_str = ''
+    if days:
+        t_str += f'{days}d{" " if hours or minutes or seconds else ""}'
+
+    if hours:
+        t_str += f'{hours}h{" " if minutes or seconds else ""}'
+
+    if minutes:
+        t_str += f'{minutes}m{" " if seconds else ""}'
+
+    if seconds:
+        t_str += f'{seconds}s'
+
+    return t_str
+
+
+def pluralise(input_num):
+    return "s" if input_num > 1 else ""
+
+
+def send_email(msg):
+    port = 465
+    context = ssl.create_default_context()
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', port, context=context) as server:
+        server.login(email_details.from_addr, email_details.from_pwd)
+        server.send_message(msg)
+
+
+def generate_notification(current_committee, next_committee):
+    in_current = True if current_committee.validators else False
+    in_next = True if next_committee.validators else False
+    in_both = True if in_current and in_next else False
+    num_current = len(current_committee.validators)
+    num_next = len(next_committee.validators)
+    num_both = num_current + num_next
+
+    v_str = 'validators are' if num_both > 1 else 'validator is'
+
+    v_msg_1 = '\n one or more of your validators are in the '
+
+    if in_current and not in_next:
+        v_msg_1 += 'current sync committee!'
+        v_msg_2 = (
+            f'to maximise your rewards (and avoid increased penalties), make sure your {v_str}\n '
+            f'online until {current_committee.end_str}.')
+
+    elif in_next and not in_current:
+        v_msg_1 += 'next sync committee!'
+        v_msg_2 = (
+            f'the next sync committee runs from {next_committee.start_str} until\n '
+            f'{next_committee.end_str}. to maximise your rewards (and avoid\n '
+            f'increased penalties), make sure your {v_str} online between these times.'
+        )
+
+    else:
+        v_msg_1 += 'current and next sync committees!'
+        v_msg_2 = (
+            f'to maximise your rewards (and avoid increased penalties), make sure your {v_str}\n '
+            f'online until {next_committee.end_str}.'
+        )
+
+    if in_current or in_next or in_both:
+        print(f'{v_msg_1}\n\n {v_msg_2}')
+
+    if email_details.are_valid:
+        msg = EmailMessage()
+
+        msg['subject '] = (
+            f'You have {"validators" if num_both > 1 else "a validator"} in the '
+            f'{"current and next" if in_both else "current" if in_current else "next"} '
+            f'sync committee{"s" if in_both else ""}!'
+        )
+
+        body = ''
+
+        if num_current:
+            body += (
+                f'sync committee: current\n'
+                f'validators: {current_committee.validators_str}\n'
+                f'committee end time: {current_committee.end_str}'
+            )
+
+        if num_next:
+            body += "\n\n" if num_current else ""
+            body += (
+                f'sync committee: next\n'
+                f'validators: {next_committee.validators_str}\n'
+                f'committee start time: {next_committee.start_str}\n'
+                f'committee end time: {next_committee.end_str}'
+            )
+
+        a = v_msg_2.replace("\n ", "\n")
+        body += f'\n\n{a}'
+
+        msg.set_content(body)
+        msg['From'] = email_details.from_addr
+        msg['To'] = email_details.to_addr
+
+        send_email(msg)
+
+    else:
+        print(
+            f'\n invalid/missing email credentials. add your email credentials and the destination '
+            f'address to the config file ({config_file}) \n in order to send notification emails.'
+        )

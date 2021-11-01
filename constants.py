@@ -1,5 +1,7 @@
 from pathlib import Path
 import configparser
+import re
+from dataclasses import dataclass, field
 
 source_path = Path(__file__).parent
 config_file = source_path / 'config.ini'
@@ -9,6 +11,7 @@ cfg = configparser.RawConfigParser()
 
 if not config_file.is_file():
     cfg['beacon'] = {'url': 'localhost', 'port': '5052'}
+    cfg['email'] = {'from': '', 'password': '', 'to': ''}
 
     with config_file.open('w') as f:
         cfg.write(f)
@@ -25,3 +28,22 @@ head_url = f'{base_url}/eth/v1/beacon/states/head/sync_committees'
 finalized_url = f'{base_url}/eth/v1/beacon/states/finalized/sync_committees'
 block_url = f'{base_url}/eth/v2/beacon/blocks/'
 genesis_url = f'{base_url}/eth/v1/beacon/genesis'
+
+
+@dataclass
+class EmailDetails:
+    from_addr: str = cfg['email'].get('from')
+    from_pwd: str = cfg['email'].get('password')
+    to_addr: str = cfg['email'].get('to')
+
+    are_valid: bool = field(init=False)
+
+    def __post_init__(self):
+        self.are_valid = True if self.is_valid(self.from_addr) and self.is_valid(self.to_addr) else False
+
+    @staticmethod
+    def is_valid(address):
+        return True if re.match(r'[^@]+@[^@]+\.[^@]+', address) else False
+
+
+email_details = EmailDetails()
