@@ -41,7 +41,9 @@ class Epoch:
         start_from_now = (self.start_time - datetime.now().astimezone()).total_seconds()
 
         if start_from_now > 0:
-            self.start_str = f'{self.start_time.strftime("%Y/%m/%d %H:%M:%S")} ({seconds_to_hms(start_from_now)} from now)'
+            self.start_str = (
+                f'{self.start_time.strftime("%Y/%m/%d %H:%M:%S")} ({seconds_to_hms(start_from_now)} from now)'
+            )
 
         end_time_utc = genesis_time + timedelta(seconds=384 * (self.epoch_number + 256))
         self.end_time = end_time_utc.astimezone()
