@@ -3,6 +3,8 @@ import configparser
 import re
 from dataclasses import dataclass, field
 
+altair_epoch = 74240
+
 source_path = Path(__file__).parent
 config_file = source_path / 'config.ini'
 validators_file = source_path / 'validators.txt'
@@ -13,6 +15,7 @@ cfg = configparser.RawConfigParser()
 if not config_file.is_file():
     cfg['beacon'] = {'url': 'localhost', 'port': '5052'}
     cfg['email'] = {'from_address': '', 'from_password': '', 'to_address': ''}
+    cfg['options'] = {'number_of_future_committees': '1'}
 
     with config_file.open('w') as f:
         cfg.write(f)
@@ -23,6 +26,8 @@ cfg.read(config_file)
 
 beacon_node_url = cfg['beacon'].get('url', fallback='localhost')
 beacon_node_port = cfg['beacon'].get('port', fallback='5052')
+
+number_of_future_committees = cfg['options'].getint('number_of_future_committees', fallback=1)
 
 base_url = f'http://{beacon_node_url}:{beacon_node_port}'
 head_url = f'{base_url}/eth/v1/beacon/states/head/sync_committees'

@@ -8,10 +8,15 @@ from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field, InitVar
 from typing import List
 
-from constants import validators_file, config_file, notified_file, finalized_url, genesis_url, block_url, email_details
+from constants import (
+    validators_file, config_file, notified_file,
+    finalized_url, genesis_url, block_url,
+    email_details, altair_epoch, number_of_future_committees
+)
 
 
 def fetch_url(url):
+    # print(url)
     try:
         response = requests.get(url)
 
@@ -26,16 +31,20 @@ def fetch_url(url):
 @dataclass
 class Epoch:
     name: str
+    name_with_num: str = field(init=False)
     epoch_number: int
     is_sync_committee: bool = False
     start_time: datetime = field(init=False)
     end_time: datetime = field(init=False)
     start_str: str = field(init=False, default='')
     end_str: str = field(init=False, default='')
+    validators_str: str = field(init=False)
 
     genesis_time: InitVar[datetime] = None
 
     def __post_init__(self, genesis_time: datetime):
+        _epoch = self.epoch_number - (int(int(self.epoch_number / 256)) * 256)
+        self.name_with_num = f'{self.name} epoch ({_epoch} of 256)'
         start_time_utc = genesis_time + timedelta(seconds=384 * self.epoch_number)
         self.start_time = start_time_utc.astimezone()
         start_from_now = (self.start_time - datetime.now().astimezone()).total_seconds()
@@ -49,41 +58,86 @@ class Epoch:
         self.end_time = end_time_utc.astimezone()
         end_from_now = (self.end_time - datetime.now().astimezone()).total_seconds()
         self.end_str = f'{self.end_time.strftime("%Y/%m/%d %H:%M:%S")} ({seconds_to_hms(end_from_now)} from now)'
+        self.validators_str = 'n/a'
 
 
 @dataclass
 class SyncCommittee(Epoch):
+    sync_committee_number: int = field(init=False)
     all_validators: List[str] = field(init=False, default_factory=list)
     validators: List[str] = field(init=False, default_factory=list)
-    validators_str: str = field(init=False)
 
     my_validators: InitVar[List[str]] = None
-    genesis_time: InitVar[datetime] = None
+    check_for_validators: InitVar[bool] = True
 
-    def __post_init__(self, genesis_time: datetime, my_validators: List[str]):
+    def __post_init__(self, genesis_time: datetime, my_validators: List[str], check_for_validators: bool):
         super().__post_init__(genesis_time=genesis_time)
+        self.sync_committee_number = int((self.epoch_number - altair_epoch) / 256)
+        self.name_with_num = f'sync committee {self.sync_committee_number}{f" ({self.name})" if self.name else ""}'
         self.is_sync_committee = True
-        response = fetch_url(f'{finalized_url}?epoch={self.epoch_number}')
-        try:
-            self.all_validators = sorted(response['data']['validators'], key=int)
+        if check_for_validators:
+            response = fetch_url(f'{finalized_url}?epoch={self.epoch_number}')
 
-        except KeyError:
-            self.validators_str = 'validators in this sync committee are not yet known'
+            try:
+                self.all_validators = sorted(response['data']['validators'], key=int)
 
-        else:
-            self.validators = sorted(list(set(self.all_validators).intersection(set(my_validators))), key=int)
-            if my_validators:
-                if self.validators:
-                    self.validators_str = stringify_list(self.validators)
-
-                else:
-                    self.validators_str = (
-                        'your validator isn\'t' if len(my_validators) == 1 else 'none of your validators are'
-                    )
-                    self.validators_str += f' in the {self.name} :('
+            except KeyError:
+                self.validators_str = 'validators in this sync committee are not yet known'
 
             else:
-                self.validators_str = 'you haven\'t specified any validators'
+                self.validators = sorted(list(set(self.all_validators).intersection(set(my_validators))), key=int)
+                if my_validators:
+                    if self.validators:
+                        self.validators_str = stringify_list(self.validators)
+
+                    else:
+                        self.validators_str = (
+                            'your validator isn\'t' if len(my_validators) == 1 else 'none of your validators are'
+                        )
+                        self.validators_str += f' in the {self.name} sync committee :('
+
+                else:
+                    self.validators_str = 'you haven\'t specified any validators'
+
+        else:
+            self.validators_str = 'validators in this sync committee are not yet known'
+
+
+def get_epochs(my_validators):
+    response = fetch_url(f'{block_url}head')
+    current_slot = int(response['data']['message']['slot'])
+    current_epoch = int(current_slot / 32)
+    current_sc_start_epoch = int(current_epoch / 256) * 256
+    next_sc_start_epoch = current_sc_start_epoch + 256
+
+    response = fetch_url(genesis_url)
+    genesis_time = datetime.fromtimestamp(int(response['data']['genesis_time']), timezone.utc)
+
+    epochs = [
+        SyncCommittee(
+            name='current', epoch_number=current_sc_start_epoch,
+            genesis_time=genesis_time, my_validators=my_validators
+        ),
+        Epoch(
+            name='current', epoch_number=current_epoch, genesis_time=genesis_time
+        ),
+        SyncCommittee(
+            name='next', epoch_number=next_sc_start_epoch,
+            genesis_time=genesis_time, my_validators=my_validators
+        )
+    ]
+
+    if number_of_future_committees:
+        for c in range(number_of_future_committees):
+            epochs.append(
+                SyncCommittee(
+                    name='', epoch_number=next_sc_start_epoch + ((c + 1) * 256),
+                    genesis_time=genesis_time, my_validators=my_validators,
+                    check_for_validators=True if c == 0 else False
+                )
+            )
+
+    return epochs
 
 
 def get_user_validators(user_provided):
@@ -146,38 +200,6 @@ def get_user_validators(user_provided):
         my_validators.extend(found_in_file)
 
     return sorted(my_validators, key=int)
-
-
-def get_epochs(my_validators):
-    response = fetch_url(f'{block_url}head')
-    current_slot = int(response['data']['message']['slot'])
-    current_epoch = int(current_slot / 32)
-    current_sc_start_epoch = int(current_epoch / 256) * 256
-    next_sc_start_epoch = current_sc_start_epoch + 256
-    next_sc_2_start_epoch = current_sc_start_epoch + 512
-
-    response = fetch_url(genesis_url)
-    genesis_time = datetime.fromtimestamp(int(response['data']['genesis_time']), timezone.utc)
-
-    epochs = {
-        'c_sync': SyncCommittee(
-            name='current sync committee', epoch_number=current_sc_start_epoch,
-            genesis_time=genesis_time, my_validators=my_validators
-        ),
-        'c_epoch': Epoch(
-            name='current epoch', epoch_number=current_epoch, genesis_time=genesis_time
-        ),
-        'n_sync': SyncCommittee(
-            name='next sync committee', epoch_number=next_sc_start_epoch,
-            genesis_time=genesis_time, my_validators=my_validators
-        ),
-        'n_sync_2': SyncCommittee(
-            name='next sync committee', epoch_number=next_sc_2_start_epoch,
-            genesis_time=genesis_time, my_validators=my_validators
-        )
-    }
-
-    return epochs
 
 
 def print_all_validators(validators):
