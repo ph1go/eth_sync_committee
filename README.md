@@ -36,3 +36,19 @@ You'll be prompted to add it/them to the validators file. Once you've added your
 without this argument.
 
 Run with `-p/--print-all` to print all of the validators in the current and next sync committees.
+
+Example output
+=
+     $ ./eth_sync_committee -v 1000 2000 3000 4000 5000 6000 7000 8000 9000
+
+     you've specified validators that aren't in the validators file. would you like to add them? y/n n
+
+     checking validators: 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000 and 9000
+
+                                  epoch    start date & time    validators
+     -----------------------------------------------------------------------------------------------------------------------
+     sync committee 6 (current)   75776   2021/11/03 07:46:47   none of your validators are in the current sync committee :(
+     current epoch (108 of 256)   75884   2021/11/03 19:17:59   n/a
+     sync committee 7 (next)      76032   2021/11/04 11:05:11   none of your validators are in the next sync committee :(
+     sync committee 8             76288   2021/11/05 14:23:35   validators in this sync committee are not yet known
+     sync committee 9             76544   2021/11/06 17:41:59   validators in this sync committee are not yet known
