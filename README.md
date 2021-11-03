@@ -23,8 +23,9 @@ validator index appears in the current or next sync committee. The sync committe
 no point checking every minute but a period of an hour will give you plenty of notice.
 
 By default, with the value of `number_of_future_committees` set to 1, 3 sync committees are shown (the current one, the 
-next one and the one after). Change this value to show more sync committees. Only the validators in the current and 
-next sync committees are known but it might be useful to see the times at which future committees occur. 
+next one and the one after). Change the number of sync committees to show after the "next" one with this value. Only the 
+validators in the current and next sync committees are known but it might be useful to see the times at which future 
+committees occur. 
 
 Running the application
 =
