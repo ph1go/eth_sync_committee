@@ -9,7 +9,9 @@ the next one and, optionally, be notified by email as soon as one is.
 The config file
 =
 If your beacon node is not at the default address (`http://localhost:5052`), you can change the url/port in the 
-`config.ini` file. 
+`config.ini` file. If you'd like to use an Infura Teku endpoint (which also allows the app to run on a machine without 
+an operational consensus layer client), enter the endpoint url (`https://<your project id>:<your project secret>@eth2-beacon-mainnet.infura.io`) for 
+the `beacon_node_url` and leave `beacon_node_port` blank.
 
 If you'd like to be notified when your validator(s) are in a sync committee, add an email address
 and your email password in the `config.ini`, along with the address to send the alerts to. It's only set up for Gmail, I 

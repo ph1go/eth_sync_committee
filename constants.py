@@ -29,7 +29,11 @@ beacon_node_port = cfg['beacon'].get('port', fallback='5052')
 
 number_of_future_committees = cfg['options'].getint('number_of_future_committees', fallback=1)
 
-base_url = f'http://{beacon_node_url}:{beacon_node_port}'
+base_url = (
+    f'{"" if re.match(r"^https?://", beacon_node_url) else "http://"}{beacon_node_url}'
+    f'{f":{beacon_node_port}" if beacon_node_port else ""}'
+)
+
 head_url = f'{base_url}/eth/v1/beacon/states/head/sync_committees'
 finalized_url = f'{base_url}/eth/v1/beacon/states/finalized/sync_committees'
 block_url = f'{base_url}/eth/v2/beacon/blocks/'
