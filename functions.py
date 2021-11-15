@@ -3,13 +3,17 @@ import json
 import requests
 import re
 import smtplib, ssl
+
 from email.message import EmailMessage
 from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field, InitVar
 from typing import List
+from crontab import CronTab
 
 from constants import (
-    validators_file, config_file, notified_file,
+    validators_file, config_file,
+    run_command, run_command_notify, run_command_cron, log_str,
+    send_alarm_emails, alarm_intervals,
     finalized_url, genesis_url, block_url,
     email_details, altair_epoch, number_of_future_committees
 )
@@ -43,7 +47,7 @@ class Epoch:
     genesis_time: InitVar[datetime] = None
 
     def __post_init__(self, genesis_time: datetime):
-        _epoch = self.epoch_number - (int(int(self.epoch_number / 256)) * 256)
+        _epoch = self.epoch_number - (int(int(self.epoch_number / 256)) * 256) + 1
         self.name_with_num = f'{self.name} epoch ({_epoch} of 256)'
         start_time_utc = genesis_time + timedelta(seconds=384 * self.epoch_number)
         self.start_time = start_time_utc.astimezone()
@@ -298,59 +302,69 @@ def generate_notification(current_committee, next_committee):
         print(f'{v_msg_1}\n\n {v_msg_2}')
 
     if email_details.are_valid:
-        if notified_file.is_file():
-            with notified_file.open() as f:
-                notified_committees = json.load(f)
+        msg = EmailMessage()
 
-        else:
-            notified_committees = {'current': '0', 'next': '0'}
+        msg['subject '] = (
+            f'You have {"validators" if num_both > 1 else "a validator"} in the '
+            f'{"current and next" if in_both else "current" if in_current else "next"} '
+            f'sync committee{"s" if in_both else ""}!'
+        )
 
-        if (
-                current_committee.epoch_number != notified_committees['current'] and
-                next_committee.epoch_number != notified_committees['next']
-        ):
-            msg = EmailMessage()
+        body = ''
 
-            msg['subject '] = (
-                f'You have {"validators" if num_both > 1 else "a validator"} in the '
-                f'{"current and next" if in_both else "current" if in_current else "next"} '
-                f'sync committee{"s" if in_both else ""}!'
+        if num_current:
+            body += (
+                f'sync committee: current\n'
+                f'validators: {current_committee.validators_str}\n'
+                f'committee end time: {current_committee.end_str}'
             )
 
-            body = ''
+        if num_next:
+            body += "\n\n" if num_current else ""
+            body += (
+                f'sync committee: next\n'
+                f'validators: {next_committee.validators_str}\n'
+                f'committee start time: {next_committee.start_str}\n'
+                f'committee end time: {next_committee.end_str}'
+            )
 
-            if num_current:
-                body += (
-                    f'sync committee: current\n'
-                    f'validators: {current_committee.validators_str}\n'
-                    f'committee end time: {current_committee.end_str}'
-                )
+        a = v_msg_2.replace("\n ", "\n")
+        body += f'\n\n{a}'
 
-            if num_next:
-                body += "\n\n" if num_current else ""
-                body += (
-                    f'sync committee: next\n'
-                    f'validators: {next_committee.validators_str}\n'
-                    f'committee start time: {next_committee.start_str}\n'
-                    f'committee end time: {next_committee.end_str}'
-                )
+        msg.set_content(body)
+        msg['From'] = email_details.from_addr
+        msg['To'] = email_details.to_addr
 
-            a = v_msg_2.replace("\n ", "\n")
-            body += f'\n\n{a}'
-
-            msg.set_content(body)
-            msg['From'] = email_details.from_addr
-            msg['To'] = email_details.to_addr
-
-            send_email(msg)
-
-            notified_committees = {'current': current_committee.epoch_number, 'next': next_committee.epoch_number}
-
-            with notified_file.open('w') as f:
-                json.dump(notified_committees, f)
+        send_email(msg)
 
     else:
         print(
             f'\n invalid/missing email credentials. add your email credentials and the destination '
             f'address to the config file ({config_file}) \n in order to send notification emails.'
         )
+
+
+def add_cron_job(next_start_time, in_next_committee=False):
+    cron = CronTab(user=True)
+    cron.remove_all(command=run_command)
+
+    print()
+    if in_next_committee and send_alarm_emails and alarm_intervals:
+        for i in sorted(alarm_intervals, reverse=True):
+            a_time = next_start_time - timedelta(hours=i)
+            job = cron.new(command=run_command_notify, comment=f'{i}h alarm')
+            job.setall(a_time)
+            print(f' added {i}h alarm cron job: {a_time.strftime("%Y/%m/%d %H:%M")}')
+
+    two_epochs_in = next_start_time + timedelta(seconds=(12 * 32 * 2))
+    m_time = two_epochs_in + timedelta(minutes=2 if two_epochs_in.second > 40 else 1)
+
+    job = cron.new(command=f'{run_command_cron}{log_str}', comment='added by eth_sync_committee.py')
+    job.setall(m_time)
+    print(f' added cron job for next run: {m_time.strftime("%Y/%m/%d %H:%M")}')
+
+    try:
+        cron.write()
+
+    except OSError:
+        print(' crontab not found...')

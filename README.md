@@ -39,6 +39,11 @@ without this argument.
 
 Run with `-p/--print-all` to print all of the validators in the current and next sync committees.
 
+Run with `-n/--notify` to send an email notification if you have any validators in the current or next sync committee.
+
+Run with `-c/--cron` to automatically add a cronjob to launch the script after the next sync committee membership is 
+known, which is at the end of that committee's second epoch. This will not work natively on Windows machines.
+
 Example output
 =
      $ ./eth_sync_committee -v 1000 2000 3000 4000 5000 6000 7000 8000 9000
