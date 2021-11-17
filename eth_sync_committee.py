@@ -64,7 +64,11 @@ if __name__ == '__main__':
             in_next_committee=True if next_committee.validators else False
         )
 
-        log_file_str += f'{cron_str}\n\n'
+        if cron_str:
+            print(f'\n{cron_str}')
+            log_file_str += f'{cron_str}\n'
+
+        log_file_str += '\n'
 
         with log_file.open('a') as f:
             f.write(log_file_str)

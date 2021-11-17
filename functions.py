@@ -119,10 +119,10 @@ def get_epochs(my_validators):
         SyncCommittee(
             name='current', epoch_number=current_sc_start_epoch,
             genesis_time=genesis_time, my_validators=my_validators
-        ),
+            ),
         Epoch(
             name='current', epoch_number=current_epoch, genesis_time=genesis_time
-        ),
+            ),
         SyncCommittee(
             name='next', epoch_number=next_sc_start_epoch,
             genesis_time=genesis_time, my_validators=my_validators
@@ -356,13 +356,12 @@ def add_cron_job(next_start_time, in_next_committee=False):
         cron = CronTab(user=True)
         cron.remove_all(command=run_command)
 
-        print()
         if in_next_committee and send_alarm_emails and alarm_intervals:
             for i in sorted(alarm_intervals, reverse=True):
                 a_time = next_start_time - timedelta(hours=i)
                 job = cron.new(command=run_command_notify, comment=f'{i}h alarm')
                 job.setall(a_time)
-                c_str += f' added {i}h alarm cron job: {a_time.strftime("%Y/%m/%d %H:%M")}'
+                c_str += f' added {i}h alarm cron job: {a_time.strftime("%Y/%m/%d %H:%M")}\n'
 
         two_epochs_in = next_start_time + timedelta(seconds=(12 * 32 * 2))
         m_time = two_epochs_in + timedelta(minutes=2 if two_epochs_in.second > 40 else 1)
@@ -372,8 +371,5 @@ def add_cron_job(next_start_time, in_next_committee=False):
         c_str += f' added cron job for next run: {m_time.strftime("%Y/%m/%d %H:%M")}'
 
         cron.write()
-
-    if c_str:
-        print(c_str)
 
     return c_str
