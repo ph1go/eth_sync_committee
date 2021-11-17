@@ -4,6 +4,7 @@ import argparse
 from functions import (
     get_user_validators, get_epochs, print_all_validators, stringify_list, generate_notification, add_cron_job
 )
+from constants import log_file
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -12,7 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--validators', nargs='*', action='store', type=str)
     parser.add_argument(
         '-c', '--cron', action='store_true',
-        help='run via crontab (adds a job to relaunch the script 2 epochs after the next sync committee starts)'
+        help='run via crontab (adds a job to launch the script 2 epochs after the next sync committee starts)'
     )
     parser.add_argument(
         '-n', '--notify', action='store_true',
@@ -40,21 +41,33 @@ if __name__ == '__main__':
         f' {"-" * (longest_name + 33 + longest_val_str)}'
     )
 
+    log_file_str = ''
+
     for e in epochs:
-        print(
+        epoch_str = (
             f' {e.name_with_num:{longest_name}} {e.epoch_number:>7}   '
             f'{e.start_time.strftime("%Y/%m/%d %H:%M:%S")}   '
             f'{e.validators_str if e.is_sync_committee else "n/a"}'
         )
 
+        if (e.name == 'current' and not e.is_sync_committee) or e.name == 'next':
+            log_file_str += f'{epoch_str}\n'
+
+        print(epoch_str)
+
     current_committee = [e for e in epochs if e.name == 'current'][0]
     next_committee = [e for e in epochs if e.name == 'next'][0]
 
     if args.cron:
-        add_cron_job(
+        cron_str = add_cron_job(
             next_start_time=next_committee.start_time,
             in_next_committee=True if next_committee.validators else False
         )
+
+        log_file_str += f'{cron_str}\n\n'
+
+        with log_file.open('a') as f:
+            f.write(log_file_str)
 
     if args.notify and current_committee.validators or next_committee.validators:
         generate_notification(current_committee=current_committee, next_committee=next_committee)

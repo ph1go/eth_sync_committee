@@ -1,5 +1,3 @@
-import json
-
 import requests
 import re
 import smtplib, ssl
@@ -12,7 +10,7 @@ from crontab import CronTab
 
 from constants import (
     validators_file, config_file,
-    run_command, run_command_notify, run_command_cron, log_str,
+    run_command, run_command_notify, run_command_cron,
     send_alarm_emails, alarm_intervals,
     finalized_url, genesis_url, block_url,
     email_details, altair_epoch, number_of_future_committees
@@ -345,26 +343,37 @@ def generate_notification(current_committee, next_committee):
 
 
 def add_cron_job(next_start_time, in_next_committee=False):
-    cron = CronTab(user=True)
-    cron.remove_all(command=run_command)
+    c_str = ''
 
-    print()
-    if in_next_committee and send_alarm_emails and alarm_intervals:
-        for i in sorted(alarm_intervals, reverse=True):
-            a_time = next_start_time - timedelta(hours=i)
-            job = cron.new(command=run_command_notify, comment=f'{i}h alarm')
-            job.setall(a_time)
-            print(f' added {i}h alarm cron job: {a_time.strftime("%Y/%m/%d %H:%M")}')
-
-    two_epochs_in = next_start_time + timedelta(seconds=(12 * 32 * 2))
-    m_time = two_epochs_in + timedelta(minutes=2 if two_epochs_in.second > 40 else 1)
-
-    job = cron.new(command=f'{run_command_cron}{log_str}', comment='added by eth_sync_committee.py')
-    job.setall(m_time)
-    print(f' added cron job for next run: {m_time.strftime("%Y/%m/%d %H:%M")}')
-
+    cron_test = CronTab(user=True)
     try:
-        cron.write()
+        cron_test.write()
 
     except OSError:
-        print(' crontab not found...')
+        c_str += ' crontab not found...'
+
+    else:
+        cron = CronTab(user=True)
+        cron.remove_all(command=run_command)
+
+        print()
+        if in_next_committee and send_alarm_emails and alarm_intervals:
+            for i in sorted(alarm_intervals, reverse=True):
+                a_time = next_start_time - timedelta(hours=i)
+                job = cron.new(command=run_command_notify, comment=f'{i}h alarm')
+                job.setall(a_time)
+                c_str += f' added {i}h alarm cron job: {a_time.strftime("%Y/%m/%d %H:%M")}'
+
+        two_epochs_in = next_start_time + timedelta(seconds=(12 * 32 * 2))
+        m_time = two_epochs_in + timedelta(minutes=2 if two_epochs_in.second > 40 else 1)
+
+        job = cron.new(command=run_command_cron, comment='added by eth_sync_committee.py')
+        job.setall(m_time)
+        c_str += f' added cron job for next run: {m_time.strftime("%Y/%m/%d %H:%M")}'
+
+        cron.write()
+
+    if c_str:
+        print(c_str)
+
+    return c_str
