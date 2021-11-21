@@ -2,9 +2,9 @@
 
 import argparse
 from functions import (
-    get_user_validators, get_epochs, print_all_validators, stringify_list, generate_notification, add_cron_job
+    get_user_validators, get_epochs, print_all_validators, stringify_list, generate_notification, add_cron_job,
+    write_log
 )
-from constants import log_file
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -70,8 +70,7 @@ if __name__ == '__main__':
 
         log_file_str += '\n'
 
-        with log_file.open('a') as f:
-            f.write(log_file_str)
+        write_log(log_file_str=log_file_str)
 
     if args.notify and current_committee.validators or next_committee.validators:
         generate_notification(current_committee=current_committee, next_committee=next_committee)

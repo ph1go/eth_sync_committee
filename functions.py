@@ -9,7 +9,7 @@ from typing import List
 from crontab import CronTab
 
 from constants import (
-    validators_file, config_file,
+    validators_file, config_file, log_file,
     run_command, run_command_notify, run_command_cron,
     send_alarm_emails, alarm_intervals,
     finalized_url, genesis_url, block_url,
@@ -373,3 +373,8 @@ def add_cron_job(next_start_time, in_next_committee=False):
         cron.write()
 
     return c_str
+
+
+def write_log(log_file_str):
+    with log_file.open('a') as f:
+        f.write(log_file_str)
