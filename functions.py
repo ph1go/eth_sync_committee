@@ -45,8 +45,7 @@ class Epoch:
     genesis_time: InitVar[datetime] = None
 
     def __post_init__(self, genesis_time: datetime):
-        _epoch = self.epoch_number - (int(int(self.epoch_number / 256)) * 256) + 1
-        self.name_with_num = f'{self.name} epoch ({_epoch} of 256)'
+        self.name_with_num = f'{self.name} epoch ({(self.epoch_number % 256) + 1} of 256)'
         start_time_utc = genesis_time + timedelta(seconds=384 * self.epoch_number)
         self.start_time = start_time_utc.astimezone()
         start_from_now = (self.start_time - datetime.now().astimezone()).total_seconds()
